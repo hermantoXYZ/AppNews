@@ -4,31 +4,28 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import User
-from .serializers import UserSerializer
+from django.utils import timezone
+from .models import User, Category, Article
+from .serializers import UserSerializer, CategorySerializer, ArticleSerializer
 
 # Create your views here.
 
-class CreateUserView(generics.CreateAPIView):
+class CreateUserView(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'user': serializer.data,
-                'token': str(refresh.access_token),
-                'refresh': str(refresh)
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
         if self.action in ['create', 'login']:
@@ -74,14 +71,56 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save()
         return Response({'message': 'Password changed successfully'})
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'user': serializer.data,
-                'token': str(refresh.access_token),
-                'refresh': str(refresh)
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    lookup_field = 'slug'
+
+class ArticleViewSet(viewsets.ModelViewSet):
+    serializer_class = ArticleSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    lookup_field = 'slug'
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated and self.request.user.is_staff:
+            return Article.objects.all()
+        return Article.objects.filter(status='published')
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def publish(self, request, slug=None):
+        article = self.get_object()
+        if article.author != request.user and not request.user.is_staff:
+            return Response(
+                {'detail': 'You do not have permission to publish this article.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        article.status = 'published'
+        article.published_at = timezone.now()
+        article.save()
+        
+        serializer = self.get_serializer(article)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def my_articles(self, request):
+        articles = Article.objects.filter(author=request.user)
+        serializer = self.get_serializer(articles, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_category(self, request):
+        category_slug = request.query_params.get('category', None)
+        if category_slug is None:
+            return Response(
+                {'detail': 'Category parameter is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        articles = self.get_queryset().filter(category__slug=category_slug)
+        serializer = self.get_serializer(articles, many=True)
+        return Response(serializer.data)

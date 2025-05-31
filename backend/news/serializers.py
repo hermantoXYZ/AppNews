@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, Category, Article
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -30,4 +30,31 @@ class UserSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         
         instance.save()
-        return instance 
+        return instance
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ('id', 'name', 'slug', 'description', 'created_at', 'updated_at')
+        read_only_fields = ('slug', 'created_at', 'updated_at')
+
+class ArticleSerializer(serializers.ModelSerializer):
+    author = UserSerializer(read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    
+    class Meta:
+        model = Article
+        fields = (
+            'id', 'title', 'slug', 'content', 'summary', 
+            'featured_image', 'author', 'category', 'category_name',
+            'status', 'views_count', 'created_at', 'updated_at', 
+            'published_at'
+        )
+        read_only_fields = (
+            'slug', 'author', 'views_count', 
+            'created_at', 'updated_at', 'published_at'
+        )
+
+    def create(self, validated_data):
+        validated_data['author'] = self.context['request'].user
+        return super().create(validated_data) 
