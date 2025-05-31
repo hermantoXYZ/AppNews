@@ -41,6 +41,7 @@ REST_FRAMEWORK = {
     ],
 }
 
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -49,6 +50,7 @@ SIMPLE_JWT = {
 # Application definition
 
 INSTALLED_APPS = [
+    'unfold',  # Must be before django.contrib.admin
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -57,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'news',
 ]
 
 MIDDLEWARE = [
@@ -144,9 +147,46 @@ CORS_ALLOWS_CREDENTIALS = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+AUTH_USER_MODEL = 'news.User'
+
+
+# Unfold Admin settings
+UNFOLD = {
+    "SITE_TITLE": "News App Admin",
+    "SITE_HEADER": "News App Administration",
+    "SITE_URL": "/",
+    "THEME": {
+        "COLORS": {
+            "primary": {
+                "50": "250 245 255",
+                "100": "243 232 255",
+                "200": "233 213 255",
+                "300": "216 180 254",
+                "400": "192 132 252",
+                "500": "168 85 247",
+                "600": "147 51 234",
+                "700": "126 34 206",
+                "800": "107 33 168",
+                "900": "88 28 135",
+            },
+        },
+        "DARK_MODE": True,
+    },
+    "STYLES": [],
+    "SCRIPTS": [],
+} 
